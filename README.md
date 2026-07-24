@@ -35,32 +35,9 @@ Deployed at **https://spinwheel.eazeapp.com**
 
 | Day | Reward |
 |-----|--------|
-| 1–3 | 20 coins |
-| 4 | 50 coins |
-| 5–6 | 10 coins |
-| 7 | 20 coins |
+| 1-7 | 10 coins |
+| 7+ | Better Luck Next time |
 
-**Days 8–14 — probabilistic tier 1**
-
-| Label | Probability | Coins |
-|-------|-------------|-------|
-| Better Luck | 60% | 0 |
-| 10 Coins | 25% | 10 |
-| 20 Coins | 9% | 20 |
-| 50 Coins | 3% | 50 |
-| 100 Coins | 2% | 100 |
-| 200 Coins | 1% | 200 |
-
-**Day 15+ — probabilistic tier 2**
-
-| Label | Probability | Coins |
-|-------|-------------|-------|
-| Better Luck | 65% | 0 |
-| 10 Coins | 24.4% | 10 |
-| 20 Coins | 9.5% | 20 |
-| 50 Coins | 1% | 50 |
-| 100 Coins | 0.09% | 100 |
-| 200 Coins | 0.01% | 200 |
 
 ---
 
