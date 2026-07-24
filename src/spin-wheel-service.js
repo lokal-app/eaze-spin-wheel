@@ -9,9 +9,13 @@ const DAILY_SPIN_LIMIT = 1;
 const DEFAULT_TESTER_NUMBERS = [];
 const COUNTED_TRANSFER_STATUSES = ['submitted', 'success', 'mock_success'];
 
-// Segment definitions — used for reward lookup and getPublicConfig().
-// Actual reward probabilities are in COHORT_PROBABILITIES and DETERMINISTIC_SCHEDULE below.
-// The order here must match CONFIG.wheelSegments in the frontend (index 0–5).
+const GUARANTEED_DAYS = parseInt(process.env.GUARANTEED_DAYS || '7', 10);
+const POST_GUARANTEE_WIN_PROBABILITY = parseInt(process.env.POST_GUARANTEE_WIN_PROBABILITY || '0', 10); // % chance of winning 10 coins after day X
+
+// This spin the wheel is for new users who haven't paid yet
+// so we give them 10 coins for GUARANTEED_DAYS, 
+// then "Better Luck Next Time" after that
+// but the probability of winning 10 coins after day 7 is controlled by POST_GUARANTEE_WIN_PROBABILITY.
 const WHEEL_SEGMENTS = [
   { id: '10_coins',    label: '10 Coins',              coin_value: 10  },
   { id: 'better_luck', label: 'Better Luck Next Time', coin_value: 0   },
@@ -19,45 +23,6 @@ const WHEEL_SEGMENTS = [
   { id: '200_coins',   label: '200 Coins',             coin_value: 200 },
   { id: '100_coins',   label: '100 Coins',             coin_value: 100 },
   { id: '20_coins',    label: '20 Coins',              coin_value: 20  },
-];
-
-// ── Cohort reward config ──────────────────────────────────────────────────────
-//
-// Day number = number of distinct calendar days a player has spun (including today).
-// Computed purely from spin_events — no external calls needed.
-//
-// Days 1–7:  deterministic (guaranteed coin amount, no Better Luck)
-// Days 8–14: probabilistic tier 1
-// Day 15+:   feature not active for these users (returns Better Luck gracefully)
-
-const DETERMINISTIC_SCHEDULE = {
-  1: '20_coins',
-  2: '20_coins',
-  3: '20_coins',
-  4: '50_coins',
-  5: '10_coins',
-  6: '10_coins',
-  7: '20_coins',
-};
-
-// Days 8–14 — tier 1. Probabilities sum to 100.
-const COHORT_PROBABILITIES_T1 = [
-  { id: 'better_luck', probability: 60    },
-  { id: '10_coins',    probability: 25    },
-  { id: '20_coins',    probability:  9    },
-  { id: '50_coins',    probability:  3    },
-  { id: '100_coins',   probability:  2    },
-  { id: '200_coins',   probability:  1    },
-];
-
-// Day 15+ — tier 2. Probabilities sum to 100.
-const COHORT_PROBABILITIES_T2 = [
-  { id: 'better_luck', probability: 65    },
-  { id: '10_coins',    probability: 24.4  },
-  { id: '20_coins',    probability:  9.5  },
-  { id: '50_coins',    probability:  1    },
-  { id: '100_coins',   probability:  0.09 },
-  { id: '200_coins',   probability:  0.01 },
 ];
 
 // ── Normalisation ─────────────────────────────────────────────────────────────
@@ -82,35 +47,22 @@ function getCountedStatusesSql(startIndex = 2) {
 
 // ── Reward determination ──────────────────────────────────────────────────────
 
-function pickFromProbabilities(probs) {
-  const roll = Math.random() * 100;
-  let cumulative = 0;
-  for (const seg of probs) {
-    cumulative += seg.probability;
-    if (roll < cumulative) return WHEEL_SEGMENTS.find((s) => s.id === seg.id);
-  }
-  return WHEEL_SEGMENTS.find((s) => s.id === 'better_luck');
-}
 
 function determineReward(dayNumber, forcedRewardId = null) {
-  // Tester forced reward — always takes precedence
   if (forcedRewardId) {
     const forced = WHEEL_SEGMENTS.find((s) => s.id === forcedRewardId);
     if (!forced) throw new Error(`Unknown reward id: ${forcedRewardId}`);
     return forced;
   }
 
-  // Days 1–7 — deterministic guaranteed reward
-  const deterministicId = DETERMINISTIC_SCHEDULE[dayNumber];
-  if (deterministicId) {
-    return WHEEL_SEGMENTS.find((s) => s.id === deterministicId);
+  if (dayNumber <= GUARANTEED_DAYS) {
+    return WHEEL_SEGMENTS.find((s) => s.id === '10_coins');
   }
 
-  // Days 8–14 — probabilistic tier 1
-  if (dayNumber <= 14) return pickFromProbabilities(COHORT_PROBABILITIES_T1);
-
-  // Day 15+ — probabilistic tier 2
-  return pickFromProbabilities(COHORT_PROBABILITIES_T2);
+  const roll = Math.random() * 100;
+  return roll < POST_GUARANTEE_WIN_PROBABILITY
+    ? WHEEL_SEGMENTS.find((s) => s.id === '10_coins')
+    : WHEEL_SEGMENTS.find((s) => s.id === 'better_luck');
 }
 
 // ── Redash user lookup ────────────────────────────────────────────────────────
@@ -373,7 +325,7 @@ export async function getPlayerState(identifier) {
       eaze_user_id:    player.eaze_user_id,
       spins_used:      spinsToday,
       max_spins:       DAILY_SPIN_LIMIT,
-      can_spin:        spinsToday < DAILY_SPIN_LIMIT,
+     can_spin:        spinsToday < DAILY_SPIN_LIMIT,
       total_coins_won: Number(player.total_coins),
     };
   });
